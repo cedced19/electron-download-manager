@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/danielnieto/electron-download-manager#readme",
   "dependencies": {
+    "async-series": "0.0.1",
     "electron": ">=1.4.12"
   }
 }

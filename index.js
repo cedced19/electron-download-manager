@@ -8,6 +8,8 @@ const app = electron.app;
 let downloadFolder = app.getPath('downloads');
 let lastWindowCreated;
 
+const series = require('async-series');
+
 const queue = [];
 
 const _popQueueItem = (url) => {
@@ -161,31 +163,38 @@ const bulkDownload = (options, callback) => {
     let urlsCount = options.urls.length;
     let finished = [];
     let errors = [];
+    const tasks = options.urls.map(url => {
+        return function(cb) {
+            download({ url, path: options.path }, function (error, itemInfo) {
 
-    options.urls.forEach((url) => {
-        download({ url, path: options.path }, function (error, itemInfo) {
-
-            if (error) {
-                errors.push(itemInfo.url);
-            } else {
-                finished.push(itemInfo.url);
-            }
-
-            let errorsCount = errors.length;
-            let finishedCount = finished.length;
-
-            if (typeof options.onResult === 'function') {
-                options.onResult(finishedCount, errorsCount, itemInfo.url);
-            }
-
-            if ((finishedCount + errorsCount) === urlsCount) {
-                if (errorsCount > 0) {
-                    callback(new Error(errorsCount + ' downloads failed'), finished, errors);
+                if (error) {
+                    errors.push(itemInfo.url);
+                    return cb(error);
                 } else {
-                    callback(null, finished, []);
+                    finished.push(itemInfo.url);
                 }
+
+                let errorsCount = errors.length;
+                let finishedCount = finished.length;
+
+                if (typeof options.onResult === 'function') {
+                    options.onResult(finishedCount, errorsCount, itemInfo.url);
+                }
+                cb(null);
+            });
+        }
+    });
+
+    series(tasks, function () {
+        let errorsCount = errors.length;
+        let finishedCount = finished.length;
+        if ((finishedCount + errorsCount) === urlsCount) {
+            if (errorsCount > 0) {
+                callback(new Error(errorsCount + ' downloads failed'), finished, errors);
+            } else {
+                callback(null, finished, []);
             }
-        });
+        }
     });
 };
 
